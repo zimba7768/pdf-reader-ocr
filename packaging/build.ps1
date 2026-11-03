@@ -43,13 +43,29 @@ if (-not $TesseractDir -or -not (Test-Path (Join-Path $TesseractDir "tesseract.e
     throw "Tesseract not found. Install it or pass -TesseractDir."
 }
 $dest = "dist\PDFReaderOCR\tesseract"
-New-Item -ItemType Directory -Force $dest | Out-Null
-Copy-Item (Join-Path $TesseractDir "tesseract.exe") $dest
-Copy-Item (Join-Path $TesseractDir "*.dll") $dest
+if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
 New-Item -ItemType Directory -Force "$dest\tessdata" | Out-Null
-foreach ($f in @("eng.traineddata", "osd.traineddata", "pdf.ttf")) {
+
+# Minimal runtime set verified against the UB-Mannheim 5.x build. ICU, libcrypto,
+# pango/cairo/glib and the training tools are not needed by tesseract.exe itself.
+$runtime = @(
+    "tesseract.exe", "libtesseract-5.dll", "libleptonica-6.dll",
+    "libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll",
+    "libarchive-13.dll", "libzstd.dll", "liblzma-5.dll", "liblz4.dll", "libbz2-1.dll", "zlib1.dll",
+    "libb2-1.dll", "libiconv-2.dll", "libexpat-1.dll",
+    "libjpeg-8.dll", "libpng16-16.dll", "libtiff-6.dll", "libwebp-7.dll", "libwebpmux-3.dll",
+    "libsharpyuv-0.dll", "libopenjp2-7.dll", "libgif-7.dll", "libLerc.dll", "libdeflate.dll", "libjbig-0.dll"
+)
+function Copy-TesseractFiles([string[]]$names) {
+    foreach ($n in $names) {
+        $src = Join-Path $TesseractDir $n
+        if (Test-Path $src) { Copy-Item $src $dest } else { Write-Warning "Tesseract file not found: $n" }
+    }
+}
+Copy-TesseractFiles $runtime
+foreach ($f in @("eng.traineddata", "pdf.ttf")) {
     $src = Join-Path $TesseractDir "tessdata\$f"
-    if (Test-Path $src) { Copy-Item $src "$dest\tessdata" }
+    if (Test-Path $src) { Copy-Item $src "$dest\tessdata" } else { Write-Warning "missing tessdata\$f" }
 }
 if (Test-Path (Join-Path $TesseractDir "tessdata\configs")) {
     Copy-Item -Recurse -Force (Join-Path $TesseractDir "tessdata\configs") "$dest\tessdata\configs"
@@ -58,10 +74,20 @@ foreach ($lic in @("LICENSE", "LICENSE.txt", "README.md")) {
     $src = Join-Path $TesseractDir $lic
     if (Test-Path $src) { Copy-Item $src "$dest\TESSERACT-$lic" }
 }
-Write-Host "==> Bundled Tesseract from $TesseractDir"
 
-# smoke-test the bundle
-& "dist\PDFReaderOCR\tesseract\tesseract.exe" --version | Select-Object -First 1
+# Self-check: the trimmed bundle must start and list the English pack. If it
+# cannot (e.g. a newer Tesseract build with different DLL names), fall back to
+# copying every DLL from the install.
+$env:TESSDATA_PREFIX = (Resolve-Path "$dest\tessdata").Path
+$langs = & "$dest\tesseract.exe" --list-langs 2>&1
+if ($LASTEXITCODE -ne 0 -or -not ($langs -match "eng")) {
+    Write-Warning "Trimmed Tesseract bundle failed to run; copying all DLLs instead."
+    Copy-Item (Join-Path $TesseractDir "*.dll") $dest -Force
+    $langs = & "$dest\tesseract.exe" --list-langs 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Bundled tesseract.exe does not run: $langs" }
+}
+Remove-Item Env:\TESSDATA_PREFIX
+Write-Host "==> Bundled Tesseract from $TesseractDir ($((Get-ChildItem $dest -Recurse | Measure-Object Length -Sum).Sum / 1MB) MB)"
 
 # ---- installer ------------------------------------------------------------
 if ($SkipInstaller) { Write-Host "==> Skipping installer"; exit 0 }

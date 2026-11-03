@@ -29,10 +29,32 @@ a = Analysis(
         "PySide6.QtBluetooth", "PySide6.QtNfc", "PySide6.QtPositioning", "PySide6.QtLocation",
         "PySide6.QtSensors", "PySide6.QtSerialPort", "PySide6.QtRemoteObjects", "PySide6.QtScxml",
         "PySide6.QtTest", "PySide6.QtDesigner", "PySide6.QtHelp", "PySide6.QtPdf", "PySide6.QtPdfWidgets",
-        "tkinter", "unittest", "pydoc",
+        "tkinter", "unittest", "pydoc", "numpy", "yaml",
     ],
     noarchive=False,
 )
+
+# Drop Qt modules PyInstaller pulls in transitively but the app never loads.
+_DROP_BINARIES = (
+    "opengl32sw.dll", "qt6quick", "qt6qml", "qt6virtualkeyboard", "qt6pdf", "qt6network", "qtnetwork",
+    "qt6svg", "qt6opengl", "d3dcompiler", "libegl", "libglesv2", "numpy",
+)
+_DROP_DATAS = ("pyside6\\translations", "pyside6/translations", "qml")
+
+
+def _keep_binary(entry):
+    name = entry[0].lower()
+    return not any(p in name for p in _DROP_BINARIES)
+
+
+def _keep_data(entry):
+    name = entry[0].lower()
+    return not any(p in name for p in _DROP_DATAS)
+
+
+a.binaries = [b for b in a.binaries if _keep_binary(b)]
+a.datas = [d for d in a.datas if _keep_data(d)]
+
 pyz = PYZ(a.pure)
 
 exe = EXE(

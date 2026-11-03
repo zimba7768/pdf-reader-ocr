@@ -72,11 +72,3 @@ Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueNa
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
 Filename: "ms-settings:defaultapps"; Description: "Open Windows 'Default apps' settings to make {#AppName} the default PDF viewer"; Flags: shellexec postinstall skipifsilent unchecked; Tasks: associate
-
-[Code]
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  // Tell the shell that associations changed so Explorer refreshes icons / Open With.
-  if CurStep = ssPostInstall then
-    RefreshEnvironment := False;
-end;
