@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdf-reader-ocr"
-version = "0.1.0"
+version = "0.1.1"
 description = "A free, open-source PDF reader for Windows with built-in OCR (Tesseract)."
 readme = "README.md"
 license = { text = "MIT" }

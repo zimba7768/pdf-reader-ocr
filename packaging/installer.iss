@@ -3,7 +3,7 @@
 ; Pass /DAppVersion=x.y.z to override the version.
 
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.1.1"
 #endif
 #define AppName "PDF Reader OCR"
 #define AppExe "PDFReaderOCR.exe"

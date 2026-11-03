@@ -46,23 +46,13 @@ $dest = "dist\PDFReaderOCR\tesseract"
 if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
 New-Item -ItemType Directory -Force "$dest\tessdata" | Out-Null
 
-# Minimal runtime set verified against the UB-Mannheim 5.x build. ICU, libcrypto,
-# pango/cairo/glib and the training tools are not needed by tesseract.exe itself.
-$runtime = @(
-    "tesseract.exe", "libtesseract-5.dll", "libleptonica-6.dll",
-    "libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll",
-    "libarchive-13.dll", "libzstd.dll", "liblzma-5.dll", "liblz4.dll", "libbz2-1.dll", "zlib1.dll",
-    "libb2-1.dll", "libiconv-2.dll", "libexpat-1.dll",
-    "libjpeg-8.dll", "libpng16-16.dll", "libtiff-6.dll", "libwebp-7.dll", "libwebpmux-3.dll",
-    "libsharpyuv-0.dll", "libopenjp2-7.dll", "libgif-7.dll", "libLerc.dll", "libdeflate.dll", "libjbig-0.dll"
-)
-function Copy-TesseractFiles([string[]]$names) {
-    foreach ($n in $names) {
-        $src = Join-Path $TesseractDir $n
-        if (Test-Path $src) { Copy-Item $src $dest } else { Write-Warning "Tesseract file not found: $n" }
-    }
-}
-Copy-TesseractFiles $runtime
+# Copy tesseract.exe plus every DLL it (transitively) imports from the install
+# folder, determined from the PE import tables. This is deterministic and does
+# not depend on what happens to be on PATH on the build machine.
+$runtime = & $py "packaging\tess_deps.py" $TesseractDir
+if ($LASTEXITCODE -ne 0 -or -not $runtime) { throw "tess_deps.py failed" }
+foreach ($n in $runtime) { Copy-Item (Join-Path $TesseractDir $n) $dest }
+Write-Host "==> Tesseract runtime files: $($runtime -join ', ')"
 foreach ($f in @("eng.traineddata", "pdf.ttf")) {
     $src = Join-Path $TesseractDir "tessdata\$f"
     if (Test-Path $src) { Copy-Item $src "$dest\tessdata" } else { Write-Warning "missing tessdata\$f" }
@@ -75,18 +65,20 @@ foreach ($lic in @("LICENSE", "LICENSE.txt", "README.md")) {
     if (Test-Path $src) { Copy-Item $src "$dest\TESSERACT-$lic" }
 }
 
-# Self-check: the trimmed bundle must start and list the English pack. If it
-# cannot (e.g. a newer Tesseract build with different DLL names), fall back to
-# copying every DLL from the install.
+# Self-check: run the bundled tesseract.exe with PATH reduced to the Windows
+# system folder only, so a DLL found elsewhere on this machine (Git's mingw
+# folder ships libcurl, libcrypto...) cannot mask a missing file in the bundle.
+# A missing DLL makes the loader exit with 0xC0000135 (-1073741515).
+$savedPath = $env:PATH
+$env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
 $env:TESSDATA_PREFIX = (Resolve-Path "$dest\tessdata").Path
 $langs = & "$dest\tesseract.exe" --list-langs 2>&1
-if ($LASTEXITCODE -ne 0 -or -not ($langs -match "eng")) {
-    Write-Warning "Trimmed Tesseract bundle failed to run; copying all DLLs instead."
-    Copy-Item (Join-Path $TesseractDir "*.dll") $dest -Force
-    $langs = & "$dest\tesseract.exe" --list-langs 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "Bundled tesseract.exe does not run: $langs" }
-}
+$code = $LASTEXITCODE
+$env:PATH = $savedPath
 Remove-Item Env:\TESSDATA_PREFIX
+if ($code -ne 0 -or -not ($langs -match "eng")) {
+    throw "Bundled tesseract.exe does not run in isolation (exit $code): $langs"
+}
 Write-Host "==> Bundled Tesseract from $TesseractDir ($((Get-ChildItem $dest -Recurse | Measure-Object Length -Sum).Sum / 1MB) MB)"
 
 # ---- installer ------------------------------------------------------------
