@@ -1,0 +1,72 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[build,test]
+
+      - name: Install Tesseract and Inno Setup
+        shell: pwsh
+        run: |
+          choco install tesseract --no-progress -y
+          choco install innosetup --no-progress -y
+          & "C:\Program Files\Tesseract-OCR\tesseract.exe" --version
+
+      - name: Run tests
+        run: |
+          python tests/make_samples.py
+          python -m pytest tests -q
+          python tests/smoke_gui.py
+
+      - name: Upload smoke-test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshots
+          path: tests/_shots/*.png
+          if-no-files-found: ignore
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $version = (python -c "import sys; sys.path.insert(0,'src'); import pdf_reader_ocr; print(pdf_reader_ocr.__version__)").Trim()
+          if ("${{ github.ref }}" -like "refs/tags/v*") {
+            $tag = "${{ github.ref_name }}".TrimStart("v")
+            if ($tag -ne $version) { throw "Tag $tag does not match __version__ $version" }
+          }
+          powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Version $version -TesseractDir "C:\Program Files\Tesseract-OCR"
+          Get-ChildItem installer_output
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: installer_output/*.exe
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer_output/*.exe
+          generate_release_notes: true

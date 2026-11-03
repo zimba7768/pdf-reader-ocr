@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+installer_output/
+*.egg-info/
+.pytest_cache/
+*_ocr.pdf
+tests/_shots/
+tests/samples/
