@@ -19,15 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Third-party components bundled with the Windows installer keep their own
-licenses:
-
-- PyMuPDF / MuPDF  - GNU AGPL v3  (https://pymupdf.readthedocs.io/en/latest/about.html#license-and-copyright)
-- Tesseract OCR    - Apache License 2.0  (https://github.com/tesseract-ocr/tesseract)
-- Leptonica        - BSD 2-Clause
-- Qt / PySide6     - GNU LGPL v3
-- Pillow           - MIT-CMU
-- pytesseract      - Apache License 2.0

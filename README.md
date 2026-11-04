@@ -90,6 +90,7 @@ line up with the printed glyphs. The original page image is left untouched.
 
 ## License
 
-The application code is MIT licensed. The installer bundles PyMuPDF (AGPL-3.0),
-Tesseract (Apache-2.0), Leptonica (BSD) and Qt/PySide6 (LGPL-3.0), which keep
-their own licenses; see [LICENSE](LICENSE).
+The application code is MIT licensed ([LICENSE](LICENSE)). The installer
+bundles PyMuPDF (AGPL-3.0), Tesseract (Apache-2.0), Leptonica (BSD) and
+Qt/PySide6 (LGPL-3.0), which keep their own licenses; see
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
